@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSale, ensureSchema, productFromRow, query } from "@/lib/db";
+import { demoAction, isDemoMode } from "@/lib/demo";
 import type { User } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -17,8 +18,13 @@ function codeFromName(name: string) {
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = await request.json();
+    if (isDemoMode()) {
+      const result = await demoAction(body);
+      return NextResponse.json({ ok: true, ...result, demo: true });
+    }
+
+    await ensureSchema();
     const action = String(body.action || "");
     const user = body.user as User;
 

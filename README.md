@@ -15,7 +15,11 @@ npm install
 npm run dev
 ```
 
-Sem `DATABASE_URL`, o login exibira aviso de banco nao configurado. O sistema nao usa `localStorage` para persistir vendas, produtos, usuarios, fiados ou auditoria.
+Para testar sem banco, rode localmente sem `DATABASE_URL`. O sistema entra automaticamente em modo demo local. Nesse modo, os dados ficam em memoria no servidor de desenvolvimento e somem ao reiniciar o servidor. O sistema nao usa `localStorage` para persistir vendas, produtos, usuarios, fiados ou auditoria.
+
+Na Vercel, o sistema detecta o ambiente e espera `DATABASE_URL`. Se a variavel existir, usa o banco real. Se nao existir, exibe o aviso de banco nao configurado.
+
+Para forcar manualmente, use `DEMO_MODE=true` ou `DEMO_MODE=false`.
 
 ## Deploy na Vercel
 
