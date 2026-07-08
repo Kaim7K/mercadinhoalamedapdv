@@ -1,4 +1,4 @@
-import { sql } from "@vercel/postgres";
+import { neon } from "@neondatabase/serverless";
 import { createHash } from "crypto";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -31,11 +31,13 @@ export function productFromRow(row: Row): Product {
 }
 
 export async function query<T extends Row = Row>(text: string, values: unknown[] = []) {
-  if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
-    throw new Error("Banco nao configurado. Vincule um Postgres ao projeto na Vercel e defina DATABASE_URL/POSTGRES_URL.");
+  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!databaseUrl) {
+    throw new Error("Banco nao configurado. Crie um banco Neon/Postgres na Vercel e defina a variavel DATABASE_URL.");
   }
+  const sql = neon(databaseUrl);
   const result = await sql.query(text, values);
-  return result.rows as T[];
+  return result as T[];
 }
 
 let schemaReady = false;

@@ -6,7 +6,7 @@ Sistema PDV criado do zero para deploy na Vercel, com frontend em Next.js e pers
 
 - Node.js 20+
 - Projeto na Vercel
-- Banco Postgres vinculado ao projeto com `POSTGRES_URL` ou `DATABASE_URL`
+- Banco Neon/Postgres vinculado ao projeto com `DATABASE_URL`
 
 ## Rodar localmente
 
@@ -15,13 +15,13 @@ npm install
 npm run dev
 ```
 
-Sem uma URL de Postgres configurada, o login exibira aviso de banco nao configurado. O sistema nao usa `localStorage` para persistir vendas, produtos, usuarios, fiados ou auditoria.
+Sem `DATABASE_URL`, o login exibira aviso de banco nao configurado. O sistema nao usa `localStorage` para persistir vendas, produtos, usuarios, fiados ou auditoria.
 
 ## Deploy na Vercel
 
 1. Importe este repositorio na Vercel.
-2. Vincule um banco Postgres/Neon ao projeto.
-3. Garanta que a variavel `POSTGRES_URL` ou `DATABASE_URL` esteja disponivel.
+2. Vincule um banco Neon/Postgres ao projeto.
+3. Garanta que a variavel `DATABASE_URL` esteja disponivel.
 4. Faça o deploy.
 
 Na primeira chamada de login, a rota `/api/bootstrap` cria as tabelas e insere dados iniciais.
