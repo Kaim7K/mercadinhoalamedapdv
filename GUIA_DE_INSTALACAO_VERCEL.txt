@@ -1,0 +1,18 @@
+MERCADOFLOW PDV — INSTALAÇÃO NO VERCEL
+
+1. Descompacte este arquivo.
+2. Envie a pasta para um repositório no GitHub, GitLab ou Bitbucket.
+3. No Vercel, clique em Add New > Project.
+4. Importe o repositório.
+5. O Vercel identificará o projeto como Vite.
+6. Confirme:
+   Build Command: npm run build
+   Output Directory: dist
+7. Clique em Deploy.
+
+ACESSO INICIAL
+Email: admin@mercadoflow.local
+Senha: admin123
+
+IMPORTANTE
+Esta versão salva os dados no navegador do dispositivo. Cada navegador possui sua própria base local. Para compartilhar vendas e estoque entre computadores, será necessário conectar um banco de dados centralizado.

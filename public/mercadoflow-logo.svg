@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 92" role="img" aria-labelledby="title desc">
+  <title id="title">MercadoFlow PDV</title>
+  <desc id="desc">Marca MercadoFlow com símbolo M.</desc>
+  <rect x="2" y="8" width="76" height="76" rx="18" fill="#f59e0b"/>
+  <path d="M18 62V29h10l12 16 12-16h10v33H51V45L40 60 29 45v17z" fill="#0f172a"/>
+  <text x="94" y="48" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700">MercadoFlow</text>
+  <text x="96" y="70" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600" letter-spacing="5">PDV</text>
+</svg>
