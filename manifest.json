@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "LovaSiri",
+  "version": "10.0",
+  "description": "Extensão premium com ativação local por chave manual.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "cookies",
+    "alarms",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://*.lovable.dev/*",
+    "https://api.lovable.dev/*",
+    "https://lovable.dev/*",
+    "https://lovable-api.com/*",
+    "https://pszychsrfssqozxpwbdr.supabase.co/*",
+    "https://livasiriteste.lovable.app/*",
+    "https://fonts.googleapis.com/*",
+    "https://fonts.gstatic.com/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://unpkg.com/*",
+    "https://api.github.com/*",
+    "https://raw.githubusercontent.com/*",
+    "https://cdnjs.cloudflare.com/*",
+    "https://ajax.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://www.google-analytics.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {},
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.lovable.dev/*",
+        "https://lovable.dev/*",
+        "https://api.lovable.dev/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "payload.js",
+        "castle-v2.js",
+        "hwFingerprint.js",
+        "icons/*.png"
+      ],
+      "matches": [
+        "https://*.lovable.dev/*",
+        "https://lovable.dev/*",
+        "https://api.lovable.dev/*"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+LOVASIRI — ATIVAÇÃO LOCAL
+
+Alterações realizadas:
+- A tela antiga de ativação foi substituída por uma nova interface.
+- A validação da chave informada é feita localmente.
+- A única chave cadastrada nesta versão é:
+  FINAL-0000-0000-0001
+- O endpoint antigo de validação de licença não é mais chamado pela tela de ativação.
+
+Para cadastrar novas chaves:
+1. Abra o arquivo payload.js.
+2. Procure pelo comentário: MANUAL LICENSE SYSTEM
+3. Adicione as novas chaves dentro de LOCAL_LICENSE_KEYS.
+
+Observação técnica:
+O núcleo funcional da interface continua sendo carregado pelo endpoint get-core já utilizado pela extensão original. A validação da tela é local, mas esse serviço externo precisa continuar disponível para entregar o núcleo funcional.
+
+Testes realizados:
+- Validação de sintaxe dos arquivos JavaScript.
+- Validação do manifest.json.
+- Teste isolado de chave inválida e chave válida.
+- Teste de persistência dos dados de ativação local.
