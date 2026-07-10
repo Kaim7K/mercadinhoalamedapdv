@@ -1,18 +1,34 @@
-MERCADOFLOW PDV — INSTALAÇÃO NO VERCEL
+MERCADOFLOW PDV - INSTALAÇÃO COM SUPABASE E VERCEL
 
-1. Descompacte este arquivo.
-2. Envie a pasta para um repositório no GitHub, GitLab ou Bitbucket.
-3. No Vercel, clique em Add New > Project.
-4. Importe o repositório.
-5. O Vercel identificará o projeto como Vite.
-6. Confirme:
-   Build Command: npm run build
-   Output Directory: dist
-7. Clique em Deploy.
+1. Crie um projeto no Supabase.
 
-ACESSO INICIAL
-Email: admin@mercadoflow.local
-Senha: admin123
+2. No SQL Editor do Supabase, execute o arquivo:
+   SUPABASE_SETUP.sql
 
-IMPORTANTE
-Esta versão salva os dados no navegador do dispositivo. Cada navegador possui sua própria base local. Para compartilhar vendas e estoque entre computadores, será necessário conectar um banco de dados centralizado.
+3. No Supabase, abra Project Settings > API e copie:
+   - Project URL
+   - chave pública anon/publishable
+   - chave secreta service_role
+
+4. No Vercel, abra Settings > Environment Variables e crie:
+   VITE_SUPABASE_URL
+   VITE_SUPABASE_ANON_KEY
+   SUPABASE_SERVICE_ROLE_KEY
+
+5. Em Authentication > URL Configuration no Supabase:
+   - defina o domínio do Vercel como Site URL
+   - adicione o domínio do Vercel em Redirect URLs
+   - para desenvolvimento, adicione http://localhost:5173/**
+
+6. Faça o deploy no Vercel.
+
+7. Abra:
+   https://SEU-DOMINIO.vercel.app/register
+
+8. Crie o primeiro administrador.
+   Depois do primeiro cadastro, novos usuários devem ser criados dentro da tela Usuários.
+
+SEGURANÇA
+- Nunca exponha SUPABASE_SERVICE_ROLE_KEY no frontend.
+- A chave service_role não pode usar o prefixo VITE_.
+- O banco já possui políticas RLS configuradas pelo arquivo SQL.

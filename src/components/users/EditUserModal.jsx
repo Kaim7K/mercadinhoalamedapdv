@@ -7,6 +7,7 @@ export default function EditUserModal({ user, onClose, onSaved }) {
   const [fullName, setFullName] = useState(user.full_name || '');
   const [role, setRole] = useState(user.role);
   const [photoUrl, setPhotoUrl] = useState(user.photo_url || '');
+  const [status, setStatus] = useState(user.status || 'ativo');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
@@ -29,12 +30,13 @@ export default function EditUserModal({ user, onClose, onSaved }) {
       await appClient.entities.User.update(user.id, {
         full_name: fullName,
         role,
-        photo_url: photoUrl
+        photo_url: photoUrl,
+        status
       });
       toast.success('Usuário atualizado');
       onSaved();
       onClose();
-    } catch (e) { toast.error('Erro ao atualizar usuário'); }
+    } catch (e) { toast.error(e.message || 'Erro ao atualizar usuário'); }
     setSaving(false);
   };
 
@@ -77,6 +79,15 @@ export default function EditUserModal({ user, onClose, onSaved }) {
               <option value="vendedor">Vendedor</option>
               <option value="gerente">Gerente</option>
               <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Status do acesso</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}
+              className="w-full mt-1 px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent">
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="pendente">Pendente</option>
             </select>
           </div>
         </div>

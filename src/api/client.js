@@ -1,6 +1,4 @@
-const DB_KEY = 'mercadoflow_database_v1';
-const SESSION_KEY = 'mercadoflow_session_v1';
-const RESET_KEY = 'mercadoflow_reset_tokens_v1';
+import { supabase } from '@/lib/supabase';
 
 const COLLECTIONS = [
   'Category',
@@ -13,99 +11,20 @@ const COLLECTIONS = [
   'User',
 ];
 
-const DEFAULT_ADMIN = {
-  id: 'user_admin_default',
-  email: 'admin@mercadoflow.local',
-  full_name: 'Administrador',
-  role: 'admin',
-  photo_url: '',
-  status: 'ativo',
-};
-
-const DEFAULT_CONFIG = [
-  { id: 'config_logo', key: 'logo_url', value: '/mercadoflow-logo.svg', label: 'Logo do sistema' },
-  { id: 'config_minimized', key: 'limite_vendas_minimizadas', value: '5', label: 'Limite de vendas minimizadas' },
-];
-
-const nowIso = () => new Date().toISOString();
-const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
 function createId(prefix = 'item') {
-  if (globalThis.crypto?.randomUUID) return `${prefix}_${globalThis.crypto.randomUUID()}`;
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const id = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  return `${prefix}_${id}`;
 }
 
-async function hashPassword(password) {
-  const value = String(password || '');
-  if (!value) throw new Error('Informe uma senha.');
-  if (globalThis.crypto?.subtle) {
-    const bytes = new TextEncoder().encode(value);
-    const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-  return btoa(unescape(encodeURIComponent(value)));
-}
-
-function readJson(key, fallback) {
-  try {
-    const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    if (error?.name === 'QuotaExceededError') {
-      throw new Error('O armazenamento do navegador está cheio. Remova imagens muito grandes ou exporte e limpe dados antigos.');
-    }
-    throw error;
-  }
-}
-
-async function ensureDatabase() {
-  let db = readJson(DB_KEY, null);
-  if (!db || typeof db !== 'object') {
-    db = Object.fromEntries(COLLECTIONS.map(name => [name, []]));
-  }
-  for (const name of COLLECTIONS) {
-    if (!Array.isArray(db[name])) db[name] = [];
-  }
-
-  if (!db.User.some(user => user.id === DEFAULT_ADMIN.id)) {
-    db.User.push({
-      ...DEFAULT_ADMIN,
-      password_hash: await hashPassword('admin123'),
-      created_date: nowIso(),
-      updated_date: nowIso(),
-    });
-  }
-
-  for (const config of DEFAULT_CONFIG) {
-    if (!db.SystemConfig.some(item => item.key === config.key)) {
-      db.SystemConfig.push({ ...config, created_date: nowIso(), updated_date: nowIso() });
-    }
-  }
-
-  writeJson(DB_KEY, db);
-  return db;
-}
-
-function sanitizeUser(user) {
-  if (!user) return null;
-  const { password_hash, ...safe } = user;
-  return safe;
-}
-
-async function mutateDatabase(callback) {
-  const db = await ensureDatabase();
-  const result = await callback(db);
-  writeJson(DB_KEY, db);
-  window.dispatchEvent(new CustomEvent('mercadoflow:data-change'));
-  return result;
+function throwIfError(error, fallback = 'Não foi possível concluir a operação.') {
+  if (!error) return;
+  const err = new Error(error.message || fallback);
+  err.code = error.code;
+  err.status = error.status;
+  throw err;
 }
 
 function parseSort(sort) {
@@ -135,181 +54,301 @@ function matchesFilter(item, criteria = {}) {
   return Object.entries(criteria).every(([key, value]) => item?.[key] === value);
 }
 
-function createEntityApi(collection) {
+function applyListOptions(items, sort, limit) {
+  const ordered = sortItems(items, sort);
+  return Number.isFinite(Number(limit)) ? ordered.slice(0, Number(limit)) : ordered;
+}
+
+function rowToEntity(row) {
+  return {
+    ...(row?.data || {}),
+    id: row.id,
+    created_date: row.created_at,
+    updated_date: row.updated_at,
+  };
+}
+
+function profileToUser(profile) {
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    email: profile.email || '',
+    full_name: profile.full_name || '',
+    role: profile.role || 'vendedor',
+    photo_url: profile.photo_url || '',
+    status: profile.status || 'ativo',
+    created_date: profile.created_at,
+    updated_date: profile.updated_at,
+  };
+}
+
+async function listProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: true });
+  throwIfError(error, 'Erro ao carregar usuários.');
+  return (data || []).map(profileToUser);
+}
+
+function createUserEntityApi() {
   return {
     async list(sort, limit) {
-      const db = await ensureDatabase();
-      const items = sortItems(db[collection], sort);
-      const limited = Number.isFinite(Number(limit)) ? items.slice(0, Number(limit)) : items;
-      return collection === 'User' ? limited.map(sanitizeUser) : structuredClone(limited);
+      return applyListOptions(await listProfiles(), sort, limit);
     },
 
     async filter(criteria = {}, sort, limit) {
-      const db = await ensureDatabase();
-      const filtered = db[collection].filter(item => matchesFilter(item, criteria));
-      const items = sortItems(filtered, sort);
-      const limited = Number.isFinite(Number(limit)) ? items.slice(0, Number(limit)) : items;
-      return collection === 'User' ? limited.map(sanitizeUser) : structuredClone(limited);
+      const users = (await listProfiles()).filter(user => matchesFilter(user, criteria));
+      return applyListOptions(users, sort, limit);
     },
 
     async get(id) {
-      const db = await ensureDatabase();
-      const item = db[collection].find(record => record.id === id);
-      if (!item) throw new Error('Registro não encontrado.');
-      return collection === 'User' ? sanitizeUser(item) : structuredClone(item);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+      throwIfError(error, 'Usuário não encontrado.');
+      return profileToUser(data);
     },
 
-    async create(data = {}) {
-      return mutateDatabase(async db => {
-        const timestamp = nowIso();
-        const item = {
-          ...structuredClone(data),
-          id: data.id || createId(collection.toLowerCase()),
-          created_date: data.created_date || timestamp,
-          updated_date: timestamp,
-        };
-        db[collection].push(item);
-        return collection === 'User' ? sanitizeUser(item) : structuredClone(item);
-      });
+    async create() {
+      throw new Error('Use a tela de criação de usuários para cadastrar um acesso.');
     },
 
-    async update(id, data = {}) {
-      return mutateDatabase(async db => {
-        const index = db[collection].findIndex(record => record.id === id);
-        if (index < 0) throw new Error('Registro não encontrado.');
-        const protectedData = collection === 'User' ? { ...data } : data;
-        if (collection === 'User') delete protectedData.password_hash;
-        db[collection][index] = {
-          ...db[collection][index],
-          ...structuredClone(protectedData),
-          id,
-          updated_date: nowIso(),
-        };
-        return collection === 'User'
-          ? sanitizeUser(db[collection][index])
-          : structuredClone(db[collection][index]);
-      });
+    async update(id, changes = {}) {
+      const allowed = ['full_name', 'role', 'photo_url', 'status'];
+      const payload = Object.fromEntries(
+        Object.entries(changes).filter(([key]) => allowed.includes(key))
+      );
+      payload.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      throwIfError(error, 'Erro ao atualizar usuário.');
+      window.dispatchEvent(new CustomEvent('mercadoflow:data-change'));
+      return profileToUser(data);
     },
 
-    async delete(id) {
-      return mutateDatabase(async db => {
-        const index = db[collection].findIndex(record => record.id === id);
-        if (index < 0) throw new Error('Registro não encontrado.');
-        const [removed] = db[collection].splice(index, 1);
-        return collection === 'User' ? sanitizeUser(removed) : structuredClone(removed);
-      });
+    async delete() {
+      throw new Error('A exclusão completa de usuários deve ser feita pelo administrador do Supabase.');
     },
   };
 }
 
-function getSessionUserId() {
-  return localStorage.getItem(SESSION_KEY);
+function createRecordEntityApi(collection) {
+  const baseQuery = () => supabase
+    .from('app_records')
+    .select('id, collection, data, created_at, updated_at')
+    .eq('collection', collection);
+
+  return {
+    async list(sort, limit) {
+      const { data, error } = await baseQuery();
+      throwIfError(error, `Erro ao carregar ${collection}.`);
+      return applyListOptions((data || []).map(rowToEntity), sort, limit);
+    },
+
+    async filter(criteria = {}, sort, limit) {
+      const items = await this.list();
+      return applyListOptions(items.filter(item => matchesFilter(item, criteria)), sort, limit);
+    },
+
+    async get(id) {
+      const { data, error } = await baseQuery().eq('id', id).single();
+      throwIfError(error, 'Registro não encontrado.');
+      return rowToEntity(data);
+    },
+
+    async create(input = {}) {
+      const id = input.id || createId(collection.toLowerCase());
+      const timestamp = new Date().toISOString();
+      const recordData = { ...structuredClone(input) };
+      delete recordData.id;
+      delete recordData.created_date;
+      delete recordData.updated_date;
+
+      const { data, error } = await supabase
+        .from('app_records')
+        .insert({
+          id,
+          collection,
+          data: recordData,
+          created_at: input.created_date || timestamp,
+          updated_at: timestamp,
+        })
+        .select('id, collection, data, created_at, updated_at')
+        .single();
+      throwIfError(error, 'Erro ao criar registro.');
+      window.dispatchEvent(new CustomEvent('mercadoflow:data-change'));
+      return rowToEntity(data);
+    },
+
+    async update(id, changes = {}) {
+      const current = await this.get(id);
+      const merged = { ...current, ...structuredClone(changes) };
+      delete merged.id;
+      delete merged.created_date;
+      delete merged.updated_date;
+
+      const { data, error } = await supabase
+        .from('app_records')
+        .update({ data: merged, updated_at: new Date().toISOString() })
+        .eq('collection', collection)
+        .eq('id', id)
+        .select('id, collection, data, created_at, updated_at')
+        .single();
+      throwIfError(error, 'Erro ao atualizar registro.');
+      window.dispatchEvent(new CustomEvent('mercadoflow:data-change'));
+      return rowToEntity(data);
+    },
+
+    async delete(id) {
+      const current = await this.get(id);
+      const { error } = await supabase
+        .from('app_records')
+        .delete()
+        .eq('collection', collection)
+        .eq('id', id);
+      throwIfError(error, 'Erro ao excluir registro.');
+      window.dispatchEvent(new CustomEvent('mercadoflow:data-change'));
+      return current;
+    },
+  };
 }
 
-function setSessionUserId(userId) {
-  if (userId) localStorage.setItem(SESSION_KEY, userId);
-  else localStorage.removeItem(SESSION_KEY);
+const entities = Object.fromEntries(
+  COLLECTIONS.map(name => [
+    name,
+    name === 'User' ? createUserEntityApi() : createRecordEntityApi(name),
+  ])
+);
+
+async function getCurrentProfile(authUser) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single();
+  throwIfError(error, 'Perfil de usuário não encontrado.');
+  if (data.status !== 'ativo') {
+    const err = new Error('Seu acesso está pendente ou inativo. Fale com um administrador.');
+    err.status = 403;
+    err.code = 'USER_INACTIVE';
+    throw err;
+  }
+  return profileToUser(data);
 }
 
-async function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
-    reader.readAsDataURL(file);
+async function authenticatedFetch(url, options = {}) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  throwIfError(sessionError, 'Sessão inválida.');
+  const token = sessionData.session?.access_token;
+  if (!token) {
+    const error = new Error('Sessão não encontrada.');
+    error.status = 401;
+    throw error;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
   });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.error || 'Erro ao comunicar com o servidor.');
+    error.status = response.status;
+    throw error;
+  }
+  return body;
 }
-
-const entities = Object.fromEntries(COLLECTIONS.map(name => [name, createEntityApi(name)]));
 
 export const appClient = {
   entities,
+  supabase,
 
   auth: {
     async me() {
-      const userId = getSessionUserId();
-      if (!userId) {
-        const error = new Error('Sessão não encontrada.');
-        error.status = 401;
-        throw error;
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        const authError = new Error('Sessão não encontrada.');
+        authError.status = 401;
+        throw authError;
       }
-      const db = await ensureDatabase();
-      const user = db.User.find(item => item.id === userId && item.status !== 'inativo');
-      if (!user) {
-        setSessionUserId(null);
-        const error = new Error('Usuário não encontrado ou inativo.');
-        error.status = 401;
-        throw error;
-      }
-      return sanitizeUser(user);
+      return getCurrentProfile(data.user);
     },
 
     async loginViaEmailPassword(email, password) {
-      const db = await ensureDatabase();
-      const normalized = normalizeEmail(email);
-      const passwordHash = await hashPassword(password);
-      const user = db.User.find(item => normalizeEmail(item.email) === normalized);
-      if (!user || user.password_hash !== passwordHash) throw new Error('Email ou senha inválidos.');
-      if (user.status === 'inativo') throw new Error('Este usuário está inativo.');
-      setSessionUserId(user.id);
-      return { user: sanitizeUser(user), access_token: user.id };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizeEmail(email),
+        password: String(password || ''),
+      });
+      throwIfError(error, 'Email ou senha inválidos.');
+      try {
+        const user = await getCurrentProfile(data.user);
+        return { user, access_token: data.session?.access_token };
+      } catch (profileError) {
+        await supabase.auth.signOut();
+        throw profileError;
+      }
     },
 
     async register({ email, password, full_name = '' }) {
       const normalized = normalizeEmail(email);
       if (!normalized) throw new Error('Informe um email válido.');
-      if (String(password || '').length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
-      return mutateDatabase(async db => {
-        if (db.User.some(item => normalizeEmail(item.email) === normalized)) {
-          throw new Error('Já existe uma conta com este email.');
-        }
-        const timestamp = nowIso();
-        const user = {
-          id: createId('user'),
-          email: normalized,
-          full_name: full_name.trim() || normalized.split('@')[0],
-          role: db.User.length === 0 ? 'admin' : 'vendedor',
-          photo_url: '',
-          status: 'ativo',
-          password_hash: await hashPassword(password),
-          created_date: timestamp,
-          updated_date: timestamp,
-        };
-        db.User.push(user);
-        setSessionUserId(user.id);
-        return { user: sanitizeUser(user), access_token: user.id };
+      if (String(password || '').length < 6) {
+        throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+      }
+
+      const { data: available, error: rpcError } = await supabase.rpc('bootstrap_available');
+      throwIfError(rpcError, 'Não foi possível verificar o cadastro inicial.');
+      if (!available) {
+        throw new Error('O administrador inicial já foi criado. Novos acessos devem ser criados pela tela Usuários.');
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalized,
+        password,
+        options: {
+          data: { full_name: full_name.trim() },
+          emailRedirectTo: window.location.origin,
+        },
       });
+      throwIfError(error, 'Não foi possível criar a conta.');
+
+      return {
+        user: data.user,
+        access_token: data.session?.access_token || null,
+        requiresEmailConfirmation: !data.session,
+      };
     },
 
     async resetPasswordRequest(email) {
-      const db = await ensureDatabase();
-      const user = db.User.find(item => normalizeEmail(item.email) === normalizeEmail(email));
-      if (!user) throw new Error('Usuário não encontrado.');
-      const token = createId('reset');
-      const tokens = readJson(RESET_KEY, {});
-      tokens[token] = { userId: user.id, expiresAt: Date.now() + 15 * 60 * 1000 };
-      writeJson(RESET_KEY, tokens);
-      return { resetToken: token };
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), { redirectTo });
+      throwIfError(error, 'Não foi possível enviar o email de redefinição.');
+      return { sent: true };
     },
 
-    async resetPassword({ resetToken, newPassword }) {
-      if (String(newPassword || '').length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
-      const tokens = readJson(RESET_KEY, {});
-      const entry = tokens[resetToken];
-      if (!entry || entry.expiresAt < Date.now()) throw new Error('Link de redefinição inválido ou expirado.');
-      await mutateDatabase(async db => {
-        const user = db.User.find(item => item.id === entry.userId);
-        if (!user) throw new Error('Usuário não encontrado.');
-        user.password_hash = await hashPassword(newPassword);
-        user.updated_date = nowIso();
-      });
-      delete tokens[resetToken];
-      writeJson(RESET_KEY, tokens);
-      return true;
+    async resetPassword({ newPassword }) {
+      if (String(newPassword || '').length < 6) {
+        throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+      }
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      throwIfError(error, 'Link de redefinição inválido ou expirado.');
+      return data.user;
     },
 
-    logout(redirectTo = '/login') {
-      setSessionUserId(null);
+    async logout(redirectTo = '/login') {
+      await supabase.auth.signOut();
       if (redirectTo) window.location.assign(redirectTo);
     },
 
@@ -317,33 +356,16 @@ export const appClient = {
       window.location.assign('/login');
     },
 
-    setToken(token) {
-      setSessionUserId(token);
+    async setToken() {
+      throw new Error('A sessão agora é controlada pelo Supabase Auth.');
     },
   },
 
   users: {
     async inviteUser(email, role = 'vendedor') {
-      const normalized = normalizeEmail(email);
-      if (!normalized) throw new Error('Informe um email válido.');
-      return mutateDatabase(async db => {
-        if (db.User.some(item => normalizeEmail(item.email) === normalized)) {
-          throw new Error('Já existe um usuário com este email.');
-        }
-        const timestamp = nowIso();
-        const user = {
-          id: createId('user'),
-          email: normalized,
-          full_name: normalized.split('@')[0],
-          role,
-          photo_url: '',
-          status: 'ativo',
-          password_hash: await hashPassword('123456'),
-          created_date: timestamp,
-          updated_date: timestamp,
-        };
-        db.User.push(user);
-        return { ...sanitizeUser(user), temporary_password: '123456' };
+      return authenticatedFetch('/api/invite-user', {
+        method: 'POST',
+        body: JSON.stringify({ email: normalizeEmail(email), role }),
       });
     },
   },
@@ -353,10 +375,21 @@ export const appClient = {
       async UploadFile({ file }) {
         if (!file) throw new Error('Selecione um arquivo.');
         if (file.size > 1024 * 1024) throw new Error('Use uma imagem de até 1 MB.');
-        return { file_url: await fileToDataUrl(file) };
+
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        throwIfError(authError, 'Sessão inválida.');
+        if (!authData.user) throw new Error('Faça login para enviar arquivos.');
+
+        const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+        const path = `${authData.user.id}/${createId('asset')}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from('mercadoflow-assets')
+          .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
+        throwIfError(uploadError, 'Erro ao enviar arquivo.');
+
+        const { data } = supabase.storage.from('mercadoflow-assets').getPublicUrl(path);
+        return { file_url: data.publicUrl, path };
       },
     },
   },
 };
-
-ensureDatabase().catch(error => console.error('Falha ao iniciar armazenamento:', error));

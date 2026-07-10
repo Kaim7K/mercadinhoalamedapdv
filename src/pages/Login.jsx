@@ -28,7 +28,11 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout title="Acesse sua conta" subtitle="MercadoFlow PDV" footer={<>Ainda não tem acesso? <Link to="/register" className="text-primary font-medium hover:underline">Criar conta</Link></>}>
+    <AuthLayout
+      title="Acesse sua conta"
+      subtitle="MercadoFlow PDV"
+      footer={<>Primeira instalação? <Link to="/register" className="text-primary font-medium hover:underline">Criar administrador</Link></>}
+    >
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
@@ -84,11 +88,6 @@ export default function Login() {
             "Entrar"
           )}
         </Button>
-        <div className="rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
-          <div className="font-medium text-foreground mb-1">Acesso inicial</div>
-          <div>Email: <code>admin@mercadoflow.local</code></div>
-          <div>Senha: <code>admin123</code></div>
-        </div>
       </form>
     </AuthLayout>
   );

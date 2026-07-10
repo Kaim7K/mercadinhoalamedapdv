@@ -33,7 +33,7 @@ export default function Usuarios() {
       toast.success(`Usuário criado. Senha provisória: ${invited.temporary_password}`);
       setShowInvite(false); setInviteEmail('');
       loadUsers();
-    } catch (e) { toast.error('Erro ao criar usuário'); }
+    } catch (e) { toast.error(e.message || 'Erro ao criar usuário'); }
     setInviting(false);
   };
 
@@ -42,7 +42,7 @@ export default function Usuarios() {
       await appClient.entities.User.update(userId, { role: newRole });
       toast.success('Perfil atualizado');
       loadUsers();
-    } catch { toast.error('Erro ao atualizar perfil'); }
+    } catch (e) { toast.error(e.message || 'Erro ao atualizar perfil'); }
   };
 
   return (

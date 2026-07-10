@@ -4,7 +4,7 @@ import { appClient } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, Mail, Lock, Loader2, User } from 'lucide-react';
+import { UserPlus, Mail, Lock, Loader2, User, CheckCircle2 } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 
 export default function Register() {
@@ -13,19 +13,25 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async event => {
     event.preventDefault();
     setError('');
+    setSuccess('');
     if (password !== confirmPassword) {
       setError('As senhas não coincidem.');
       return;
     }
     setLoading(true);
     try {
-      await appClient.auth.register({ email, password, full_name: fullName });
-      window.location.assign('/');
+      const result = await appClient.auth.register({ email, password, full_name: fullName });
+      if (result.requiresEmailConfirmation) {
+        setSuccess('Administrador criado. Confirme o email recebido e depois faça login.');
+      } else {
+        window.location.assign('/');
+      }
     } catch (err) {
       setError(err.message || 'Não foi possível criar a conta.');
     } finally {
@@ -33,11 +39,24 @@ export default function Register() {
     }
   };
 
+  if (success) {
+    return (
+      <AuthLayout
+        icon={CheckCircle2}
+        title="Conta criada"
+        subtitle="Confirme seu endereço de email"
+        footer={<Link to="/login" className="text-primary font-medium hover:underline">Voltar ao login</Link>}
+      >
+        <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm text-center">{success}</div>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Criar conta"
-      subtitle="Cadastre um acesso para o MercadoFlow PDV"
+      title="Administrador inicial"
+      subtitle="Disponível apenas enquanto o sistema ainda não possui usuários"
       footer={<>Já possui uma conta? <Link to="/login" className="text-primary font-medium hover:underline">Entrar</Link></>}
     >
       {error && <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
@@ -71,7 +90,7 @@ export default function Register() {
           </div>
         </div>
         <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Criando...</> : 'Criar conta'}
+          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Criando...</> : 'Criar administrador'}
         </Button>
       </form>
     </AuthLayout>
